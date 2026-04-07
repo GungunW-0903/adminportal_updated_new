@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
+import { invalidateUserProfile } from '@/lib/profileCache'
 
 export async function PUT(request) {
   try {
@@ -61,7 +62,10 @@ export async function PUT(request) {
           `UPDATE user SET ${queryParts.join(', ')} WHERE email = ?`,
           updateValues
       )
-
+      // INVALIDATE CACHE AFTER UPDATE
+      await invalidateUserProfile(params.email);
+      console.log(`✓ Cache invalidated for ${params.email}`);
+      
       return NextResponse.json(result)
     }
 

@@ -4,6 +4,7 @@ import { query } from '@/lib/db'
 import { ROLES, hasAccess } from '@/lib/roles'
 // import { authOptions } from '../auth/[...nextauth]/route'
 import { authOptions } from '@/lib/authOptions'
+import { invalidateUserProfile } from '@/lib/profileCache' 
 
 export async function POST(request) {
   const session = await getServerSession(authOptions)
@@ -63,6 +64,10 @@ export async function POST(request) {
     params.data.department || null,
   ]
       )
+      if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
       return NextResponse.json(noticeResult)
     }
 
@@ -86,6 +91,10 @@ export async function POST(request) {
               params.retirement_date || null
             ]
           )
+          if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
           return NextResponse.json(userResult)
 
         case 'webteam':
@@ -102,6 +111,10 @@ export async function POST(request) {
               params.role
             ]
           )
+          if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
           return NextResponse.json(webteamResult)
 
         case 'event':
@@ -125,6 +138,10 @@ export async function POST(request) {
               params.data.type || 'general'
               ]
           )
+          if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
           return NextResponse.json(eventResult)
 
         case 'innovation':
@@ -144,6 +161,10 @@ export async function POST(request) {
               new Date().getTime()
             ]
           )
+          if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
           return NextResponse.json(innovationResult)
 
         case 'news':
@@ -164,6 +185,10 @@ export async function POST(request) {
               new Date().getTime()
             ]
           )
+          if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
           return NextResponse.json(newsResult)
 
          
@@ -199,6 +224,10 @@ export async function POST(request) {
                 params.supervisor_type
               ]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(phdResult)
 
           case 'journal_papers':
@@ -243,7 +272,10 @@ export async function POST(request) {
                  GROUP BY jp.id
                  ORDER BY jp.publication_year DESC`
             );
-
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json({ journalResult, papersWithCollaborators });
 
           case 'conference_papers':
@@ -297,7 +329,6 @@ export async function POST(request) {
                 )
               }
             }
-
             const conferencesWithCollaborators = await query(
               `SELECT cp.*, GROUP_CONCAT(cpc.email) AS collaboraters
                FROM conference_papers cp
@@ -307,6 +338,10 @@ export async function POST(request) {
                GROUP BY cp.id`,
               [params.id]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
 
             return NextResponse.json({ conference: conferencesWithCollaborators[0] || null })
 
@@ -333,6 +368,10 @@ export async function POST(request) {
                   [params.id, email]
                 )
               }
+            }
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
             }
             return NextResponse.json(textbookResult)
 
@@ -368,7 +407,10 @@ export async function POST(request) {
                GROUP BY eb.id`,
               [params.id]
             )
-
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json({ editedBook: editedBooksWithCollaborators[0] || null })
 
           case 'book_chapters':
@@ -395,6 +437,10 @@ export async function POST(request) {
                   [params.id, email]
                 )
               }
+            }
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
             }
             return NextResponse.json(chapterResult)
 
@@ -424,6 +470,10 @@ export async function POST(request) {
                 )
               }
             }
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(sponsoredResult)
 
           case 'consultancy_projects':
@@ -450,6 +500,10 @@ export async function POST(request) {
                 )
               }
             }
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(consultancyResult)
 
           case 'teaching_engagement':
@@ -472,6 +526,10 @@ export async function POST(request) {
                 params.years_offered
               ]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(teachingResult)
 
             case 'memberships':
@@ -504,6 +562,11 @@ export async function POST(request) {
                       params.end_date 
                   ]
               );
+              if (params.email) {
+                await invalidateUserProfile(params.email);
+                console.log(`✓ Cache invalidated after create for ${params.email}`);
+              }
+
               return NextResponse.json(supervisionResult);
       
             case 'workshops_conferences':
@@ -537,7 +600,10 @@ export async function POST(request) {
                   )
                 }
               }
-              
+              if (params.email) {
+                await invalidateUserProfile(params.email);
+                console.log(`✓ Cache invalidated after create for ${params.email}`);
+              }
               return NextResponse.json(workshopResult);
           
           case 'institute_activities':
@@ -552,6 +618,10 @@ export async function POST(request) {
                 params.end_date
               ]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(instituteResult)
 
           case 'department_activities':
@@ -566,6 +636,10 @@ export async function POST(request) {
                 params.end_date
               ]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(departmentResult)
 
           case 'work_experience':
@@ -581,6 +655,10 @@ export async function POST(request) {
                 params.description
               ]
             )
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
             return NextResponse.json(workExpResult)
 
             case 'ipr':
@@ -604,7 +682,10 @@ export async function POST(request) {
             await query(`INSERT INTO ipr_collaborater(ipr_id, email) VALUES (?, ?)`, [id, email])
           }
         }
-
+        if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
+            }
         return NextResponse.json({ message: 'Record created successfully', data: iprResult });
     } catch (error) {
         console.error('Error inserting IPR record:', error);
@@ -630,6 +711,10 @@ export async function POST(request) {
               for (const email of params.collaboraters) {
                 await query(`INSERT INTO startups_collaborater(startups_id, email) VALUES (?, ?)`, [params.id, email])
               }
+            }
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after create for ${params.email}`);
             }
             return NextResponse.json(startupResult)
 

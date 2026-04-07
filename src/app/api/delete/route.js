@@ -4,6 +4,7 @@ import { query } from '@/lib/db'
 import { ROLES } from '@/lib/roles'
 import { authOptions } from '@/lib/authOptions'
 import { deleteS3File, extractS3KeyFromUrl } from '@/lib/utils'
+import { invalidateUserProfile } from '@/lib/profileCache' 
 
 export async function POST(request) {
   const session = await getServerSession(authOptions)
@@ -108,6 +109,10 @@ export async function POST(request) {
         `DELETE FROM notices WHERE id = ?`,
         [params.id]
       )
+      if (params.email) {
+      await invalidateUserProfile(params.email);
+      console.log(`✓ Cache invalidated after delete for ${params.email}`);
+    }
       return NextResponse.json(result)
     }
 
@@ -153,6 +158,10 @@ export async function POST(request) {
             `DELETE FROM webteam WHERE id = ?`,
             [params.id]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(webteamResult)
 
         case 'event':
@@ -160,6 +169,10 @@ export async function POST(request) {
             `DELETE FROM events WHERE id = ?`,
             [params.id]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(eventResult)
 
         case 'innovation':
@@ -167,6 +180,10 @@ export async function POST(request) {
             `DELETE FROM innovation WHERE id = ?`,
             [params.id]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(innovationResult)
 
         case 'news':
@@ -174,6 +191,10 @@ export async function POST(request) {
             `DELETE FROM news WHERE id = ?`,
             [params.id]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(newsResult)
       }
     }
@@ -186,6 +207,10 @@ export async function POST(request) {
             `DELETE FROM phd_candidates WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(phdResult)
 
           case 'patents':
@@ -193,7 +218,10 @@ export async function POST(request) {
                 `DELETE FROM patents WHERE id = ?`,
                 [params.id]
             );
-        
+            if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+            }
             if (deleteResult.affectedRows > 0) {
                 return NextResponse.json({ message: 'Patent deleted successfully' });
             } else {
@@ -206,6 +234,10 @@ export async function POST(request) {
             `DELETE FROM journal_papers WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(journalResult)
 
         case 'conference_papers':
@@ -213,6 +245,10 @@ export async function POST(request) {
             `DELETE FROM conference_papers WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(conferenceResult)
 
         case 'textbooks':
@@ -220,6 +256,10 @@ export async function POST(request) {
             `DELETE FROM textbooks WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(textbookResult)
 
         case 'edited_books':
@@ -227,6 +267,10 @@ export async function POST(request) {
             `DELETE FROM edited_books WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(editedBookResult)
 
         case 'book_chapters':
@@ -234,6 +278,10 @@ export async function POST(request) {
             `DELETE FROM book_chapters WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(chapterResult)
 
         case 'sponsored_projects':
@@ -241,6 +289,10 @@ export async function POST(request) {
             `DELETE FROM sponsored_projects WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(sponsoredResult)
 
         case 'consultancy_projects':
@@ -248,6 +300,10 @@ export async function POST(request) {
             `DELETE FROM consultancy_projects WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(consultancyResult)
 
         case 'teaching_engagement':
@@ -255,6 +311,10 @@ export async function POST(request) {
             `DELETE FROM teaching_engagement WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(teachingResult)
 
           case 'memberships':
@@ -262,6 +322,10 @@ export async function POST(request) {
                 `DELETE FROM memberships WHERE id = ?`,
                 [params.id]
             );
+            if (params.email) {
+              await invalidateUserProfile(params.email);
+              console.log(`✓ Cache invalidated after delete for ${params.email}`);
+            }
             return NextResponse.json(deleteMembershipResult);
 
         case 'project_supervision':
@@ -269,6 +333,11 @@ export async function POST(request) {
             `DELETE FROM project_supervision WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
+
           return NextResponse.json(supervisionResult)
 
         case 'workshops_conferences':
@@ -276,6 +345,10 @@ export async function POST(request) {
             `DELETE FROM workshops_conferences WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(workshopResult)
 
         case 'institute_activities':
@@ -283,6 +356,10 @@ export async function POST(request) {
             `DELETE FROM institute_activities WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(instituteResult)
 
         case 'department_activities':
@@ -290,6 +367,10 @@ export async function POST(request) {
             `DELETE FROM department_activities WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(departmentResult)
 
         case 'work_experience':
@@ -297,6 +378,11 @@ export async function POST(request) {
             `DELETE FROM work_experience WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
+
           return NextResponse.json(workExpResult)
 
         case 'ipr':
@@ -304,6 +390,10 @@ export async function POST(request) {
             `DELETE FROM ipr WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(iprResult)
 
         case 'startups':
@@ -311,6 +401,10 @@ export async function POST(request) {
             `DELETE FROM startups WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(startupResult)
 
         case 'internships':
@@ -318,12 +412,20 @@ export async function POST(request) {
             `DELETE FROM internships WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(internshipResult)
         case 'education':
           const educationResult = await query(
             `DELETE FROM education WHERE id = ? AND email = ?`,
             [params.id, params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(educationResult)
 
         case 'profile_image':
@@ -331,6 +433,11 @@ export async function POST(request) {
             `UPDATE user SET image = NULL WHERE email = ?`,
             [params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
+
           return NextResponse.json(imageResult)
 
         case 'profile_cv':
@@ -338,6 +445,10 @@ export async function POST(request) {
             `UPDATE user SET cv = NULL WHERE email = ?`,
             [params.email]
           )
+          if (params.email) {
+            await invalidateUserProfile(params.email);
+            console.log(`✓ Cache invalidated after delete for ${params.email}`);
+          }
           return NextResponse.json(cvResult)
       }
     }
