@@ -5,19 +5,19 @@ import { administrationList, depList } from "@/lib/const";
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type");
-    const subNoticeType = searchParams.get("notice-sub_types"); // add sub_notice_types
+    const type = searchParams.get("type")?.trim();
+    const noticeSubType = searchParams.get("notice_sub_type")?.trim().toUpperCase();
     const now = new Date().getTime();
 
     let results;
     switch (type) {
       case "all":
-        if (subNoticeType) {
+        if (noticeSubType) {
           results = await query(
             `SELECT * FROM notices 
-             WHERE sub_notice_type = ?
+             WHERE notice_sub_type = ?
              ORDER BY timestamp DESC`,
-            [subNoticeType],
+            [noticeSubType],
           );
         } else {
           results = await query(
@@ -28,13 +28,13 @@ export async function GET(request) {
         break;
 
       case "tender":
-        if (subNoticeType) {
+        if (noticeSubType) {
           results = await query(
             `SELECT * FROM notices 
              WHERE notice_type="tender" 
-             AND sub_notice_type = ?
+             AND notice_sub_type = ?
              ORDER BY timestamp DESC`,
-            [subNoticeType],
+            [noticeSubType],
           );
         } else {
           results = await query(
@@ -71,15 +71,15 @@ export async function GET(request) {
         break;
 
       default:
-
-        if (administrationList.has(type)) {
-          if (subNoticeType) {
+        if ([...administrationList.keys()].some(key => key === type?.trim().toLowerCase())) {
+  
+          if (noticeSubType) {
             results = await query(
               `SELECT * FROM notices 
                WHERE notice_type = ? 
-               AND sub_notice_type = ?
+               AND notice_sub_type = ?
                ORDER BY timestamp DESC`,
-              [type, subNoticeType],
+              [type, noticeSubType],
             );
           } else {
             results = await query(
@@ -91,7 +91,7 @@ export async function GET(request) {
           }
         }
         // Check if it's a department notice
-        else if (depList.has(type)) {
+        else if ([...depList.keys()].some(key => key === type.trim().toLowerCase())) {
           results = await query(
             `SELECT * FROM notices 
              WHERE notice_type = 'department' 
