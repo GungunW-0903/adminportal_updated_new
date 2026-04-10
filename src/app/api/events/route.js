@@ -7,17 +7,21 @@ export async function GET(request) {
     const type = searchParams.get('type')
     const now = new Date().getTime()
 
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
+    const offset = (page - 1) * limit
+
     let results
     switch (type) {
       case 'all':
         results = await query(
-          `SELECT * FROM events ORDER BY openDate DESC`
+          `SELECT * FROM events ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
       case 'active':
         results = await query(
-          `SELECT * FROM events WHERE openDate < ? AND closeDate > ? ORDER BY openDate DESC`,
+          `SELECT * FROM events WHERE openDate < ? AND closeDate > ? ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`,
           [now, now]
         )
         break
@@ -32,7 +36,15 @@ export async function GET(request) {
     // Parse attachments for each event
     const events = JSON.parse(JSON.stringify(results))
     events.forEach(event => {
-      event.attachments = JSON.parse(event.attachments)
+      if (event.attachments) {
+        try {
+          event.attachments = JSON.parse(event.attachments)
+        } catch (e) {
+          event.attachments = []
+        }
+      } else {
+        event.attachments = []
+      }
     })
 
     return NextResponse.json(events)
@@ -50,13 +62,24 @@ export async function POST(request) {
   try {
     const body = await request.json()
     let { type } = body
-    
+    let { from, to } = body
+
+    from = parseInt(from) || 0
+    to = parseInt(to) || 10
+
+    if (from < 0) from = 0
+    if (to <= from) to = from + 10
+
+    const limit = Math.max(1, Math.min(50, to - from))
+    const offset = Math.max(0, from)
+
     let results
     switch (type) {
       case 'all':
         results = await query(
           `SELECT * FROM events 
-           ORDER BY timestamp DESC`
+           ORDER BY timestamp DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -65,7 +88,8 @@ export async function POST(request) {
         results = await query(
           `SELECT * FROM events 
            WHERE closeDate <= ? AND openDate >= ? 
-           ORDER BY openDate DESC`,
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`,
           [end_date, start_date]
         )
         break

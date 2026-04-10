@@ -26,8 +26,9 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page')) || 1;
-    const limit = parseInt(searchParams.get('limit')) || 10;
+
+    const page = Math.max(1,parseInt(searchParams.get('page')) || 1);
+    const limit = Math.min(50,parseInt(searchParams.get('limit')) || 10);
     const offset = (page - 1) * limit;
     const type = searchParams.get('type')
     let results
@@ -95,8 +96,7 @@ export async function GET(request) {
               FROM user u 
               WHERE u.is_deleted = 0
               ORDER BY u.name ASC
-              LIMIT ? OFFSET ?`,
-              [limit, offset]
+              LIMIT ${limit} OFFSET ${offset}`
         )
         // Transform the results to include role name
         return NextResponse.json(results.map(user => ({
@@ -109,17 +109,20 @@ export async function GET(request) {
         const departments = [...depList.values()]
         
         // Fetch faculty from each department
-        for (let i = 0; i < departments.length - 1; i++) {
+        for (let i = 0; i < departments.length; i++) {
           const data = await query(
-            `SELECT * FROM user WHERE department = ? AND is_deleted = 0 ORDER BY name ASC LIMIT ? OFFSET ?`,
-            [departments[i], limit, offset]
-          ).catch(e => console.error('Department query error:', e))
-          
+            `SELECT * FROM user WHERE department = ? AND is_deleted = 0 ORDER BY name ASC`,
+            [departments[i]]
+          )
+
           if (data) {
             results = [...results, ...data]
           }
         }
-        return NextResponse.json(results.sort())
+        results = results.sort((a, b) => a.name.localeCompare(b.name))
+        results = results.slice(offset, offset + limit)
+
+        return NextResponse.json(results)
 
       case 'count':
         const countResult = await query(

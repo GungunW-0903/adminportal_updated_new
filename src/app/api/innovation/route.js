@@ -7,11 +7,15 @@ export async function GET(request) {
     const type = searchParams.get('type')
     const now = new Date().getTime()
 
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
+    const offset = (page - 1) * limit
+
     let results
     switch (type) {
       case 'all':
         results = await query(
-          `SELECT * FROM innovation ORDER BY openDate DESC`
+          `SELECT * FROM innovation ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -19,7 +23,8 @@ export async function GET(request) {
         results = await query(
           `SELECT * FROM innovation 
            WHERE openDate < ? AND closeDate > ? 
-           ORDER BY openDate DESC`,
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`,
           [now, now]
         )
         break
@@ -71,27 +76,33 @@ export async function POST(request) {
     const body = await request.json()
     const { type } = body
     
+    let { from, to} = body
+    from = parseInt(from) || 0
+    to = parseInt(to) || 10
+
+    if (from < 0) from = 0
+    if (to <= from) to = from + 10
+
+    const limit = Math.max(1, Math.min(50, to - from))
+    const offset = Math.max(0, from)
+
     let results
     switch (type) {
       case 'range':
-        const { start_date, end_date, from, to } = body
+        const { start_date, end_date } = body
         results = await query(
           `SELECT * FROM innovation 
            WHERE closeDate <= ? AND openDate >= ? 
-           ORDER BY openDate DESC LIMIT ?, ?`,
-          [end_date, start_date, from, to - from]
+           ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`,
+          [end_date, start_date]
         )
         break
 
       case 'between':
-        let { from: fromIndex, to: toIndex } = body
-        fromIndex = parseInt(fromIndex, 10);
-        toIndex = parseInt(toIndex, 10);
         results = await query(
           `SELECT * FROM innovation 
            ORDER BY openDate DESC 
-           LIMIT ?,?`,
-          [fromIndex, toIndex - fromIndex]
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -106,7 +117,13 @@ export async function POST(request) {
     const innovations = JSON.parse(JSON.stringify(results))
     innovations.forEach(innovation => {
       if (innovation.image) {
-        innovation.image = JSON.parse(innovation.image)
+        try {
+          innovation.image = JSON.parse(innovation.image)
+        } catch {
+          innovation.image = []
+        }
+      } else {
+        innovation.image = []
       }
     })
 

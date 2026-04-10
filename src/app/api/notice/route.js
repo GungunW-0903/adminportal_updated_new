@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { administrationList, depList } from '@/lib/const'
+import { off } from 'node:cluster'
 
 export async function GET(request) {
   try {
@@ -8,12 +9,17 @@ export async function GET(request) {
     const type = searchParams.get('type')
     const now = new Date().getTime()
 
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
+    const offset = (page - 1) * limit
+
     let results
     switch (type) {
       case 'all':
         results = await query(
           `SELECT * FROM notices 
-           ORDER BY timestamp DESC`
+           ORDER BY timestamp DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -21,14 +27,16 @@ export async function GET(request) {
         results=await query(
           `SELECT * FROM notices 
           where notice_type="tender"
-           ORDER BY timestamp DESC`
+           ORDER BY timestamp DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
       case 'whole':
         results = await query(
           `SELECT * FROM notices 
-           ORDER BY openDate DESC`
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -37,8 +45,9 @@ export async function GET(request) {
           `SELECT * FROM notices 
            WHERE notice_type = 'general' 
            AND openDate < ? AND closeDate > ? 
-           ORDER BY openDate DESC`,
-          [now, now]
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+           [now, now]
         )
         break
 
@@ -46,7 +55,8 @@ export async function GET(request) {
         results = await query(
           `SELECT * FROM notices 
            WHERE notice_type = 'academics'
-           ORDER BY timestamp DESC`
+           ORDER BY timestamp DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -56,7 +66,8 @@ export async function GET(request) {
           results = await query(
             `SELECT * FROM notices 
              WHERE notice_type = ? 
-             ORDER BY timestamp DESC`,
+             ORDER BY timestamp DESC
+             LIMIT ${limit} OFFSET ${offset}`,
             [type]
           )
         }
@@ -66,7 +77,8 @@ export async function GET(request) {
             `SELECT * FROM notices 
              WHERE notice_type = 'department' 
              AND department = ? 
-             ORDER BY timestamp DESC`,
+             ORDER BY timestamp DESC
+             LIMIT ${limit} OFFSET ${offset}`,
             [depList.get(type)]
           )
         }
@@ -82,7 +94,13 @@ export async function GET(request) {
     const notices = JSON.parse(JSON.stringify(results))
     notices.forEach(notice => {
       if (notice.attachments) {
-        notice.attachments = JSON.parse(notice.attachments)
+        try {
+          notice.attachments = JSON.parse(notice.attachments)
+        } catch (e) {
+          notice.attachments = []
+        }
+      } else {
+        notice.attachments = []
       }
     })
 
@@ -188,9 +206,8 @@ export async function POST(request) {
           break
 
         case 'between':
-          const limit = Math.max(1, Math.min(100, to - from)) // Ensure limit is between 1 and 100
-          const offset = Math.max(0, from) // Ensure offset is non-negative
-          console.log('DEBUG: Pagination params:', { offset, limit, originalFrom: from, originalTo: to })
+          
+          console.log('DEBUG: Pagination params:', { offset, limit })
           
           // Try without prepared statements for LIMIT clause
           results = await query(
@@ -212,7 +229,13 @@ export async function POST(request) {
     const notices = JSON.parse(JSON.stringify(results))
     notices.forEach(notice => {
       if (notice.attachments) {
-        notice.attachments = JSON.parse(notice.attachments)
+        try {
+          notice.attachments = JSON.parse(notice.attachments)
+        } catch (e) {
+          notice.attachments = []
+        }
+      } else {
+        notice.attachments = []
       }
     })
 
