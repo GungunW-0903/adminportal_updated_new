@@ -31,7 +31,8 @@ export async function GET(request) {
     const limit = Math.min(50,parseInt(searchParams.get('limit')) || 10);
     const offset = (page - 1) * limit;
     const type = searchParams.get('type')
-    let results
+    let results = []
+    let total = 0
 
     const origin = request.headers.get('origin')
     const isAllowedOrigin = allowedOrigins.includes(origin)
@@ -80,7 +81,12 @@ export async function GET(request) {
           );
 
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM user WHERE is_deleted = 0`
+        )
+        total = countRes[0].count
+
         results = await query(
           `SELECT 
             u.*, 
@@ -99,13 +105,20 @@ export async function GET(request) {
               LIMIT ${limit} OFFSET ${offset}`
         )
         // Transform the results to include role name
-        return NextResponse.json(results.map(user => ({
-          ...user,
-          role: user.role_name // Replace numeric role with string role
-        })))
-
-      case 'faculties':
-        results = []
+        return NextResponse.json({
+          page,
+          limit,
+          offset,
+          total,
+          totalPages: Math.ceil(total / limit),
+          data: results.map(u => ({
+            ...u,
+            role: u.role_name
+          }))
+        })
+      }
+    
+      case 'faculties':{
         const departments = [...depList.values()]
         
         // Fetch faculty from each department
@@ -114,27 +127,40 @@ export async function GET(request) {
             `SELECT * FROM user WHERE department = ? AND is_deleted = 0 ORDER BY name ASC`,
             [departments[i]]
           )
-
-          if (data) {
-            results = [...results, ...data]
-          }
+          results = [...results, ...data]
         }
-        results = results.sort((a, b) => a.name.localeCompare(b.name))
-        results = results.slice(offset, offset + limit)
 
-        return NextResponse.json(results)
+        const paginated = results
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .slice(offset, offset + limit)
 
-      case 'count':
+        return NextResponse.json({
+          page,
+          limit,
+          offset,
+          total,
+          totalPages: Math.ceil(total / limit),
+          data: paginated
+        })
+      
+      }
+      case 'count':{
         const countResult = await query(
           `SELECT COUNT(*) as count FROM user WHERE is_deleted = 0`
         )
         return NextResponse.json({ 
           facultyCount: countResult[0].count 
         })
-
+      }
       default:
         // Check if it's a department query
         if (depList.has(type)) {
+          const countRes = await query(
+            `SELECT COUNT(*) as count FROM user WHERE department = ? AND is_deleted = 0`,
+            [depList.get(type)]
+          )
+          total = countRes[0].count
+
           results = await query(
             `SELECT 
             u.*, 
@@ -143,7 +169,14 @@ export async function GET(request) {
               where department = ? AND u.is_deleted = 0`,
             [depList.get(type)]
           )
-          return NextResponse.json(results)
+          return NextResponse.json({
+            page,
+            limit,
+            offset,
+            total,
+            totalPages: Math.ceil(total / limit),
+            data: results
+          })
         }
 
         // Individual faculty profile query - OPTIMIZED WITH CONNECTION POOLING

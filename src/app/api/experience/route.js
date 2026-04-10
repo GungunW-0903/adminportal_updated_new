@@ -30,7 +30,7 @@
           WHERE id = ?`,
           [designation, institute, start_date, validEndDate, id.toString()]
         );
-
+        
         if (result.affectedRows === 1) {
           return NextResponse.json({ message: "Successfully updated work experience" }, { status: 200 });
         }

@@ -11,21 +11,26 @@ export async function GET(request) {
     const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
     const offset = (page - 1) * limit
 
-    let results
+    let results = []
+    let total = 0
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(`SELECT COUNT(*) as count FROM events`)
+        total = countRes[0].count
         results = await query(
           `SELECT * FROM events ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`
         )
         break
-
-      case 'active':
+      }
+      case 'active':{
+        const countRes = await query(`SELECT COUNT(*) as count FROM events`)
+        total = countRes[0].count
         results = await query(
           `SELECT * FROM events WHERE openDate < ? AND closeDate > ? ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`,
           [now, now]
         )
         break
-
+}
       default:
         return NextResponse.json(
           { message: 'Invalid type parameter' },
@@ -47,7 +52,14 @@ export async function GET(request) {
       }
     })
 
-    return NextResponse.json(events)
+    return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: events
+    })
 
   } catch (error) {
     console.error('API Error:', error)
@@ -73,18 +85,28 @@ export async function POST(request) {
     const limit = Math.max(1, Math.min(50, to - from))
     const offset = Math.max(0, from)
 
-    let results
+    let results = []
+    let total = 0
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(`SELECT COUNT(*) as count FROM events`)
+        total = countRes[0].count
+
         results = await query(
           `SELECT * FROM events 
            ORDER BY timestamp DESC
            LIMIT ${limit} OFFSET ${offset}`
         )
         break
-
-      case 'range':
+      }
+      case 'range':{
         const { start_date, end_date } = body
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM events 
+           WHERE closeDate <= ? AND openDate >= ?`,
+          [end_date, start_date]
+        )
+        total = countRes[0].count        
         results = await query(
           `SELECT * FROM events 
            WHERE closeDate <= ? AND openDate >= ? 
@@ -93,7 +115,7 @@ export async function POST(request) {
           [end_date, start_date]
         )
         break
-
+}
       default:
         return NextResponse.json(
           { message: 'Invalid type parameter' },
@@ -115,7 +137,14 @@ export async function POST(request) {
       }
     })
 
-    return NextResponse.json(events)
+      return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: events
+    })
 
   } catch (error) {
     console.error('API Error:', error)

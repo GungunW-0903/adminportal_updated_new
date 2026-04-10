@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { depList } from '@/lib/const'
 import { off } from 'node:cluster'
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,16 +12,39 @@ export async function GET(request) {
     const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
     const offset = (page - 1) * limit
 
-    let results
+    let results = []
+    let total = 0
     switch (type) {
       case 'all':
+
+        const allCount = await query(
+          `SELECT COUNT(*) as count FROM conference_papers`
+        )
+        total = allCount[0].count
+
         const conference_papers = await query(
           `SELECT * FROM conference_papers ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`
         );
-        return NextResponse.json(conference_papers)
+        return NextResponse.json({
+            page,
+            limit,
+            offset,
+            total,
+            totalPages: Math.ceil(total / limit),
+            conference_papers})
 
       default:
         if (depList.has(type)) {
+          const deptCount = await query(
+            `SELECT COUNT(*) as count 
+             FROM user u 
+             JOIN conference_papers t 
+             ON u.email = t.email 
+             WHERE u.department = ?`,
+            [depList.get(type)]
+          )
+          total = deptCount[0].count
+
           const conference_data = await query(
             `SELECT t.*, u.department 
              FROM user u 
@@ -31,7 +55,13 @@ export async function GET(request) {
              LIMIT ${limit} OFFSET ${offset}`,
             [depList.get(type)]
           );
-          return NextResponse.json(conference_data);
+          return NextResponse.json({
+            page,
+            limit,
+            offset,
+            total,
+            totalPages: Math.ceil(total/limit),
+            conference_data});
         } else {
           return NextResponse.json(
             { message: 'Invalid type parameter' },

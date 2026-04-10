@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 
+const safeParse = (value) => {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return []
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,15 +19,27 @@ export async function GET(request) {
     const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
     const offset = (page - 1) * limit
 
-    let results
+    let results = []
+    let total = 0
     switch (type) {
       case 'all':
+        const allCount = await query(`SELECT COUNT(*) as count FROM innovation`)
+        total = allCount[0].count
+
         results = await query(
           `SELECT * FROM innovation ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
       case 'active':
+
+        const activeCount = await query(
+          `SELECT COUNT(*) as count FROM innovation 
+           WHERE openDate < ? AND closeDate > ?`,
+          [now, now]
+        )
+        total = activeCount[0].count
+
         results = await query(
           `SELECT * FROM innovation 
            WHERE openDate < ? AND closeDate > ? 
@@ -44,6 +64,8 @@ export async function GET(request) {
             `SELECT * FROM innovation WHERE id = ?`,
             [type]
           )
+
+          total = results.length
         } else {
           return NextResponse.json(
             { message: 'Invalid type parameter' },
@@ -53,14 +75,20 @@ export async function GET(request) {
     }
 
     // Parse image JSON for each result
-    const innovations = JSON.parse(JSON.stringify(results))
-    innovations.forEach(innovation => {
-      if (innovation.image) {
-        innovation.image = JSON.parse(innovation.image)
-      }
+    const innovations = results.map(item => ({
+      ...item,
+      image: item.image ? safeParse(item.image) : []
+    }))
+
+    return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages : Math.ceil(total/limit),
+      data : innovations
     })
 
-    return NextResponse.json(innovations)
 
   } catch (error) {
     console.error('API Error:', error)
@@ -90,6 +118,13 @@ export async function POST(request) {
     switch (type) {
       case 'range':
         const { start_date, end_date } = body
+        const rangeCount = await query(
+          `SELECT COUNT(*) as count FROM innovation 
+           WHERE closeDate <= ? AND openDate >= ?`,
+          [end_date, start_date]
+        )
+        total = rangeCount[0].count
+
         results = await query(
           `SELECT * FROM innovation 
            WHERE closeDate <= ? AND openDate >= ? 
@@ -99,6 +134,11 @@ export async function POST(request) {
         break
 
       case 'between':
+        const betweenCount = await query(
+          `SELECT COUNT(*) as count FROM innovation`
+        )
+        total = betweenCount[0].count
+
         results = await query(
           `SELECT * FROM innovation 
            ORDER BY openDate DESC 
@@ -114,20 +154,19 @@ export async function POST(request) {
     }
 
     // Parse image JSON for each result
-    const innovations = JSON.parse(JSON.stringify(results))
-    innovations.forEach(innovation => {
-      if (innovation.image) {
-        try {
-          innovation.image = JSON.parse(innovation.image)
-        } catch {
-          innovation.image = []
-        }
-      } else {
-        innovation.image = []
-      }
-    })
+    const innovations = results.map(item => ({
+      ...item,
+      image: item.image ? safeParse(item.image) : []
+    }))
 
-    return NextResponse.json(innovations)
+      return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages : Math.ceil(total/limit),
+      data : innovations
+    })
 
   } catch (error) {
     console.error('API Error:', error)

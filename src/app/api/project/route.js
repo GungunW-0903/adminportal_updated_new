@@ -5,68 +5,110 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10)
+    const offset = (page - 1) * limit
 
-    let results
+    let results = []
+    let total = 0
     switch (type) {
       case 'all':
-        results = await query(
-          `SELECT * FROM sponsored_projects
-            ORDER BY end_date DESC`
-        );
-        const consultancy_projects = await query(
-          `SELECT * FROM consultancy_projects
-            ORDER BY start_date DESC`
-        );
-        const data = [...results, ...consultancy_projects];
-        return NextResponse.json(data);
+        const count1 = await query(`SELECT COUNT(*) as count FROM sponsored_projects`)
+        const count2 = await query(`SELECT COUNT(*) as count FROM consultancy_projects`)
 
-        case 'count':
-          let sponsoredCount = await query(
-            `SELECT COUNT(*) as count FROM sponsored_projects`
-          ).catch(error => {
-            console.error('Error fetching sponsored project count:', error);
-            return null;
-          });
-          let consultancyCount = await query(
-            `SELECT COUNT(*) as count FROM consultancy_projects`
-          ).catch(error => {
-            console.error('Error fetching consultancy project count:', error);
-            return null;
-          });
-          if (sponsoredCount === null || consultancyCount === null) {
-            return NextResponse.json(
-              { message: 'Failed to fetch project count' },
-              { status: 500 }
-            );
-          }
-          const totalCount = parseInt(sponsoredCount[0].count) + parseInt(consultancyCount[0].count);
-          return NextResponse.json({ 
-            projectCount: totalCount 
-          });
+        total = Number(count1[0].count) + Number(count2[0].count)
+        const sponsored = await query(
+          `SELECT * FROM sponsored_projects ORDER BY end_date DESC LIMIT ${limit} OFFSET ${offset}`
+        )
+
+        const consultancy = await query(
+          `SELECT * FROM consultancy_projects ORDER BY start_date DESC LIMIT ${limit} OFFSET ${offset}`
+        )       
+        results = [...sponsored, ...consultancy]
+        
+        return NextResponse.json({
+          page,
+          limit,
+          offset,
+          total,
+          totalPages : Math.ceil( total / limit),
+          data : results
+        });
+
+        case 'count':{
+          const sponsoredCount = await query(
+          `SELECT COUNT(*) as count FROM sponsored_projects`
+        )
+
+        const consultancyCount = await query(
+          `SELECT COUNT(*) as count FROM consultancy_projects`
+        )
+          
+        return NextResponse.json({
+          projectCount:
+            parseInt(sponsoredCount[0].count) +
+            parseInt(consultancyCount[0].count)
+        })
+      }
       default:
-        if(depList.has(type)){
-          results = await query(
-            `SELECT * FROM user u 
-             JOIN sponsored_projects sp 
-             ON u.email = sp.email 
+        if (depList.has(type)) {
+
+          const dept = depList.get(type)
+
+          const count1 = await query(
+            `SELECT COUNT(*) as count 
+             FROM user u 
+             JOIN sponsored_projects sp ON u.email = sp.email 
              WHERE u.department = ?`,
-            [depList.get(type)]
+            [dept]
           )
 
-          let consultancy_projects = await query(
-            `SELECT * FROM user u 
-             JOIN consultancy_projects cp 
-             ON u.email = cp.email 
+          const count2 = await query(
+            `SELECT COUNT(*) as count 
+             FROM user u 
+             JOIN consultancy_projects cp ON u.email = cp.email 
              WHERE u.department = ?`,
-            [depList.get(type)]
+            [dept]
           )
-          return NextResponse.json([...results, ...consultancy_projects])
-        }else{
+
+          total =Number( count1[0].count) + Number(count2[0].count)
+
+          const sponsored = await query(
+            `SELECT * 
+             FROM user u 
+             JOIN sponsored_projects sp ON u.email = sp.email 
+             WHERE u.department = ?
+             ORDER BY sp.end_date DESC
+             LIMIT ${limit} OFFSET ${offset}`,
+            [dept]
+          )
+
+          const consultancy = await query(
+            `SELECT * 
+             FROM user u 
+             JOIN consultancy_projects cp ON u.email = cp.email 
+             WHERE u.department = ?
+             ORDER BY cp.start_date DESC
+             LIMIT ${limit} OFFSET ${offset}`,
+            [dept]
+          )
+
+          results = [...sponsored, ...consultancy]
+
+          return NextResponse.json({
+            page,
+            limit,
+            offset,
+            total,
+            totalPages: Math.ceil(total / limit),
+            data: results
+          })
+        }
           return NextResponse.json(
             { message: 'Invalid type parameter' },
             { status: 400 }
           )
-        }
+        
     }
 
   } catch (error) {
@@ -81,55 +123,133 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { type, department, from, to } = body
+    const { type, department, from=0, to=10 } = body
 
-    let results
+    const limit = Math.max(1, Math.min(50, to - from))
+    const offset = Math.max(0, from)
+
+    let results = []
+    let total = 0
     switch (type) {
-      case 'department':
-        // Get projects by department with pagination
-        results = await query(
-          `SELECT * FROM project 
-           WHERE department = ? 
-           ORDER BY end DESC 
-           LIMIT ?, ?`,
-          [department, from, to - from]
-        )
-        break
 
-      case 'faculty':
-        // Get projects by faculty email
+      case 'department': {
+        const dept = department
+
+        const count1 = await query(
+          `SELECT COUNT(*) as count 
+           FROM sponsored_projects sp 
+           JOIN user u ON u.email = sp.email 
+           WHERE u.department = ?`,
+          [dept]
+        )
+
+        const count2 = await query(
+          `SELECT COUNT(*) as count 
+           FROM consultancy_projects cp 
+           JOIN user u ON u.email = cp.email 
+           WHERE u.department = ?`,
+          [dept]
+        )
+
+        total = count1[0].count + count2[0].count
+
+        const sponsored = await query(
+          `SELECT * 
+           FROM sponsored_projects sp 
+           JOIN user u ON u.email = sp.email 
+           WHERE u.department = ?
+           ORDER BY sp.end_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [dept]
+        )
+
+        const consultancy = await query(
+          `SELECT * 
+           FROM consultancy_projects cp 
+           JOIN user u ON u.email = cp.email 
+           WHERE u.department = ?
+           ORDER BY cp.start_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [dept]
+        )
+
+        results = [...sponsored, ...consultancy]
+
+        break
+      }
+      case 'faculty':{
         const { email } = body
-        results = await query(
-          `SELECT * FROM project 
-           WHERE email = ? 
-           ORDER BY end DESC`,
+
+        const sponsored = await query(
+          `SELECT * FROM sponsored_projects 
+           WHERE email = ?
+           ORDER BY end_date DESC`,
           [email]
         )
-        break
 
-      case 'range':
-        // Get projects within date range
-        const { start_date, end_date } = body
-        results = await query(
-          `SELECT * FROM project 
-           WHERE start >= ? AND end <= ? 
-           ORDER BY end DESC 
-           LIMIT ?, ?`,
-          [start_date, end_date, from, to - from]
+        const consultancy = await query(
+          `SELECT * FROM consultancy_projects 
+           WHERE email = ?
+           ORDER BY start_date DESC`,
+          [email]
         )
-        break
 
-      case 'search':
+        results = [...sponsored, ...consultancy]
+        total = results.length
+
+        break
+      }
+
+      case 'range':{
+        // Get projects within date range
+       const { start_date, end_date } = body
+
+        const sponsored = await query(
+          `SELECT * FROM sponsored_projects 
+           WHERE start_date >= ? AND end_date <= ?
+           ORDER BY end_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [start_date, end_date]
+        )
+
+        const consultancy = await query(
+          `SELECT * FROM consultancy_projects 
+           WHERE start_date >= ? AND end_date <= ?
+           ORDER BY end_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [start_date, end_date]
+        )
+
+        results = [...sponsored, ...consultancy]
+        total = results.length
+
+        break
+      }
+      case 'search':{
         // Search projects by keyword
         const { keyword = '' } = body
-        results = await query(
-          `SELECT * FROM project 
-           WHERE project LIKE ? OR sponsor LIKE ? 
-           ORDER BY end DESC 
-           LIMIT ?, ?`,
-          [`%${keyword}%`, `%${keyword}%`, from, to - from]
+
+        const sponsored = await query(
+          `SELECT * FROM sponsored_projects 
+           WHERE project LIKE ? OR sponsor LIKE ?
+           ORDER BY end_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [`%${keyword}%`, `%${keyword}%`]
         )
+
+        const consultancy = await query(
+          `SELECT * FROM consultancy_projects 
+           WHERE project LIKE ? OR sponsor LIKE ?
+           ORDER BY end_date DESC
+           LIMIT ${limit} OFFSET ${offset}`,
+          [`%${keyword}%`, `%${keyword}%`]
+        )
+
+        results = [...sponsored, ...consultancy]
+        total = results.length
+
         break
+      }
 
       default:
         return NextResponse.json(

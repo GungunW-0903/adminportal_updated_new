@@ -9,13 +9,26 @@ export async function GET(request) {
         const limit = Math.min(50, parseInt(searchParams.get('limit')) || 10);
         const offset = (page - 1) * limit;
 
-        let results;
+        let results = []
+        let total = 0
         switch (type) {
             case 'all':
+                const allCount = await query(
+                `SELECT COUNT(*) as count FROM ipr WHERE type = "Patent"`
+                )
+                total = allCount[0].count
+                        
                 results = await query(
                     `SELECT * FROM ipr WHERE type = "Patent" LIMIT ${limit} OFFSET ${offset}`
                 );
-                return NextResponse.json(results);
+                return NextResponse.json({
+                    page,
+                    limit,
+                    offset,
+                    total,
+                    totalPages : Math.ceil(total/limit),
+                    data : results
+                });
 
             case 'count':
                 const patentCount = await query(
@@ -25,6 +38,16 @@ export async function GET(request) {
 
             default:
                 if(depList.has(type)){
+                const deptCount = await query(
+                    `SELECT COUNT(*) as count
+                    FROM ipr i
+                    JOIN user u ON u.email = i.email
+                    WHERE i.type = "Patent"
+                    AND u.department = ?
+                    AND u.is_deleted = 0`,
+                    [depList.get(type)]
+                );
+                total = deptCount[0].count;
                     results = await query(
                         `SELECT i.*, u.name, u.department
                         FROM ipr i
@@ -37,7 +60,14 @@ export async function GET(request) {
                         [depList.get(type)]
                         );
                     
-                    return NextResponse.json(results);
+                    return NextResponse.json({
+                        page,
+                        limit,
+                        offset,
+                        total,
+                        totalPages : Math.ceil(total/limit),
+                        data:results
+                    });
                 }else{
                     return NextResponse.json(
                         { message: 'Invalid type parameter' },
