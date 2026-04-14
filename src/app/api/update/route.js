@@ -301,7 +301,7 @@ export async function PUT(request) {
               ]
             )
             await invalidateProfileIfNeeded(type, params);
-            await invalidatePublicationsCache(null);
+            
             return NextResponse.json(socialResult)
           } else {
             const {
