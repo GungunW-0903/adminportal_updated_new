@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { NextResponse } from 'next/server'
+import { query } from '@/lib/db'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/authOptions'
+import { invalidateProfileIfNeeded } from '@/lib/profileCache'
 import { notice_sub_types } from '@/lib/const';
 export async function PUT(request) {
   try {
@@ -147,24 +148,22 @@ export async function PUT(request) {
             department = ?
         WHERE id = ?`,
         [
-          params.data.title,
-          new Date().getTime(),
-          params.data.openDate,
-          params.data.closeDate,
-          params.data.important || 0,
-          JSON.stringify(params.data.attachments),
-          params.data.notice_link || null,
-          params.data.isVisible === undefined
-            ? 1
-            : Number(params.data.isVisible),
-          session?.user?.email,
-          params.data.notice_type || null,
-          params.data.notice_sub_type?.trim()?.toUpperCase() || null,
-          params.data.department || null,
-          params.data.id,
-        ],
-      );
-      return NextResponse.json(result);
+            params.data.title,
+            new Date().getTime(),
+            params.data.openDate,
+            params.data.closeDate,
+            params.data.important || 0,
+            JSON.stringify(params.data.attachments),
+            params.data.notice_link || null,
+            params.data.isVisible === undefined ? 1 : Number(params.data.isVisible),
+            session.user.email,
+            params.data.notice_type || null,
+            params.data.department || null,
+            params.data.id
+        ]
+      )   
+      await invalidateProfileIfNeeded(type, params);   
+      return NextResponse.json(result)
     }
 
     // Super Admin only access
@@ -198,11 +197,12 @@ export async function PUT(request) {
               params.data.eventStartDate,
               params.data.eventEndDate,
               params.data.updatedBy || session.user.email,
-              params.data.type || "general",
-              params.data.id,
-            ],
-          );
-          return NextResponse.json(eventResult);
+              params.data.type || 'general',
+              params.data.id
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(eventResult)
 
         case "patents":
           const patentResult = await query(
@@ -217,6 +217,7 @@ export async function PUT(request) {
               params.id,
             ],
           );
+          await invalidateProfileIfNeeded(type, params);
           return NextResponse.json(patentResult);
 
         case "innovation":
@@ -240,10 +241,11 @@ export async function PUT(request) {
               JSON.stringify(params.data.image),
               params.data.author,
               params.data.email,
-              params.data.id,
-            ],
-          );
-          return NextResponse.json(innovationResult);
+              params.data.id
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(innovationResult)
 
         case "news":
           const newsResult = await query(
@@ -268,10 +270,11 @@ export async function PUT(request) {
               JSON.stringify(params.data.add_attach),
               params.data.author,
               params.data.email,
-              params.data.id,
-            ],
-          );
-          return NextResponse.json(newsResult);
+              params.data.id
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(newsResult)
 
         case "user":
           if (params.update_social_media_links) {
@@ -285,16 +288,17 @@ export async function PUT(request) {
                orcid = ?
                WHERE email = ?`,
               [
-                params.Linkedin || "",
-                params["Google Scholar"] || "",
-                params["Personal Webpage"] || "",
-                params["Scopus"] || "",
-                params["Vidwan"] || "",
-                params["Orcid"] || "",
-                session.user.email,
-              ],
-            );
-            return NextResponse.json(socialResult);
+                params.Linkedin || '',
+                params['Google Scholar'] || '',
+                params['Personal Webpage'] || '',
+                params['Scopus'] || '',
+                params['Vidwan'] || '',
+                params['Orcid'] || '',
+                session.user.email
+              ]
+            )
+            await invalidateProfileIfNeeded(type, params);
+            return NextResponse.json(socialResult)
           } else {
             const {
               email,
@@ -336,10 +340,11 @@ export async function PUT(request) {
                 academic_responsibility || null,
                 is_retired,
                 formattedRetirementDate,
-                email,
-              ],
-            );
-            return NextResponse.json(facultyResult);
+                email
+              ]
+            )
+            await invalidateProfileIfNeeded(type, params);
+            return NextResponse.json(facultyResult)
           }
       }
     }
@@ -374,10 +379,11 @@ export async function PUT(request) {
               params.supervisor_type,
               params.registration_date,
               params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(phdResult);
+              params.email
+            ]
+          ); 
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(phdResult)
 
         case "journal_papers": {
           try {
@@ -458,20 +464,22 @@ export async function PUT(request) {
                 WHERE jp.id = ?
                 GROUP BY jp.id
                 ORDER BY jp.publication_year DESC`,
-              [params.id],
-            );
+                [params.id]
+              );
+              await invalidateProfileIfNeeded(type, params);
+              return NextResponse.json({
+                success: true,
+                message: 'Journal paper and collaborators updated successfully',
+                data: papersWithCollaborators[0] || {}
+              });
 
-            return NextResponse.json({
-              success: true,
-              message: "Journal paper and collaborators updated successfully",
-              data: papersWithCollaborators[0] || {},
-            });
-          } catch (error) {
-            console.error("[Journal Paper Update Error]:", error);
-            return NextResponse.json(
-              { success: false, error: error.message },
-              { status: 500 },
-            );
+            } catch (error) {
+              console.error('[Journal Paper Update Error]:', error);
+              return NextResponse.json(
+                { success: false, error: error.message },
+                { status: 500 }
+              );
+            }
           }
         }
 
@@ -540,8 +548,10 @@ export async function PUT(request) {
                ON cp.id = cpc.conference_papers_id
              WHERE cp.id = ?
              GROUP BY cp.id`,
-            [params.id],
-          );
+            [params.id]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json({ conference: conferencesWithCollaborators[0] || null })
 
           return NextResponse.json({
             conference: conferencesWithCollaborators[0] || null,
@@ -585,7 +595,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(textbookResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(textbookResult)
 
         case "edited_books":
           const editedBookResult = await query(
@@ -631,12 +642,10 @@ export async function PUT(request) {
                ON eb.id = ebc.edited_books_id
              WHERE eb.id = ?
              GROUP BY eb.id`,
-            [params.id],
-          );
-
-          return NextResponse.json({
-            editedBook: updatedEditedBooks[0] || null,
-          });
+            [params.id]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json({ editedBook: updatedEditedBooks[0] || null })
 
         case "book_chapters":
           const chapterResult = await query(
@@ -679,7 +688,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(chapterResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(chapterResult)
 
         // Projects
         case "sponsored_projects":
@@ -725,7 +735,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(sponsoredResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(sponsoredResult)
 
         case "consultancy_projects":
           const consultancyResult = await query(
@@ -766,7 +777,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(consultancyResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(consultancyResult)
 
         // IPR and Startups
         case "ipr":
@@ -807,7 +819,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(iprResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(iprResult)
 
         case "startups":
           const startupResult = await query(
@@ -844,7 +857,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(startupResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(startupResult)
 
         // Teaching and Activities
         case "teaching_engagement":
@@ -877,10 +891,11 @@ export async function PUT(request) {
               params.lab_hours,
               params.years_offered,
               params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(teachingResult);
+              params.email
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(teachingResult)
 
         case "memberships":
           const membershipUpdateResult = await query(
@@ -900,6 +915,7 @@ export async function PUT(request) {
               params.id,
             ],
           );
+          await invalidateProfileIfNeeded(type, params);
           return NextResponse.json(membershipUpdateResult);
 
         case "project_supervision":
@@ -925,6 +941,7 @@ export async function PUT(request) {
               params.email,
             ],
           );
+          await invalidateProfileIfNeeded(type, params);
           return NextResponse.json(supervisionResult);
 
         case "workshops_conferences":
@@ -964,7 +981,8 @@ export async function PUT(request) {
               );
             }
           }
-          return NextResponse.json(workshopResult);
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(workshopResult)
 
         case "institute_activities":
           const instituteResult = await query(
@@ -980,10 +998,11 @@ export async function PUT(request) {
               params.start_date,
               params.end_date,
               params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(instituteResult);
+              params.email
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(instituteResult)
 
         case "department_activities":
           const departmentResult = await query(
@@ -999,10 +1018,11 @@ export async function PUT(request) {
               params.start_date,
               params.end_date,
               params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(departmentResult);
+              params.email
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(departmentResult)
 
         case "internships":
           const internshipResult = await query(
@@ -1024,10 +1044,11 @@ export async function PUT(request) {
               params.end_date,
               params.student_type,
               params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(internshipResult);
+              params.email
+            ]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(internshipResult)
 
         case "education":
           const educationResult = await query(
@@ -1037,16 +1058,10 @@ export async function PUT(request) {
              passing_year = ?,
              specialization=?
              WHERE id = ? AND email = ?`,
-            [
-              params.certification,
-              params.institution,
-              params.passing_year,
-              params.specialization,
-              params.id,
-              params.email,
-            ],
-          );
-          return NextResponse.json(educationResult);
+            [params.certification, params.institution, params.passing_year,params.specialization, params.id, params.email]
+          )
+          await invalidateProfileIfNeeded(type, params);
+          return NextResponse.json(educationResult)
       }
     }
     return NextResponse.json(
