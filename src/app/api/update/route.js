@@ -3,6 +3,9 @@ import { query } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import { invalidateProfileIfNeeded } from '@/lib/profileCache'
+import { invalidatePublicationsCache } from '@/lib/publicationsCache';
+import { PUBLICATION_TYPES } from '../../../lib/const'
+
 import { notice_sub_types } from '@/lib/const';
 export async function PUT(request) {
   try {
@@ -301,6 +304,7 @@ export async function PUT(request) {
               ]
             )
             await invalidateProfileIfNeeded(type, params);
+            
             return NextResponse.json(socialResult)
           } else {
             const {
@@ -347,6 +351,7 @@ export async function PUT(request) {
               ]
             )
             await invalidateProfileIfNeeded(type, params);
+            await invalidatePublicationsCache(null);
             return NextResponse.json(facultyResult)
           }
       }
@@ -470,6 +475,9 @@ export async function PUT(request) {
                 [params.id]
               );
               await invalidateProfileIfNeeded(type, params);
+              if (PUBLICATION_TYPES.includes(type)) {
+                await invalidatePublicationsCache(params.email);
+              }
               return NextResponse.json({
                 success: true,
                 message: 'Journal paper and collaborators updated successfully',
@@ -554,6 +562,9 @@ export async function PUT(request) {
             [params.id]
           )
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json({ conference: conferencesWithCollaborators[0] || null })
 
           return NextResponse.json({
@@ -599,6 +610,9 @@ export async function PUT(request) {
             }
           }
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(textbookResult)
 
         case "edited_books":
@@ -692,6 +706,9 @@ export async function PUT(request) {
             }
           }
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(chapterResult)
 
         // Projects

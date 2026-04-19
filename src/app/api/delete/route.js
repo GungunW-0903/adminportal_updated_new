@@ -5,6 +5,8 @@ import { ROLES } from '@/lib/roles'
 import { authOptions } from '@/lib/authOptions'
 import { deleteS3File, extractS3KeyFromUrl } from '@/lib/utils' 
 import { invalidateProfileIfNeeded } from '@/lib/profileCache'
+import { invalidatePublicationsCache } from '@/lib/publicationsCache';
+import { PUBLICATION_TYPES } from '../../../lib/const'
 
 export async function POST(request) {
   const session = await getServerSession(authOptions)
@@ -151,6 +153,7 @@ export async function POST(request) {
             ).catch(e => console.error(`Error deleting from ${table}:`, e))
           }
           await invalidateProfileIfNeeded(type, params);
+          await invalidatePublicationsCache(null);
           return NextResponse.json({ message: 'User and related data deleted successfully' })
 
         case 'webteam':
@@ -217,6 +220,9 @@ export async function POST(request) {
             [params.id, params.email]
           )
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(journalResult)
 
         case 'conference_papers':
@@ -225,6 +231,9 @@ export async function POST(request) {
             [params.id, params.email]
           )
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(conferenceResult)
 
         case 'textbooks':
@@ -233,6 +242,9 @@ export async function POST(request) {
             [params.id, params.email]
           )
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(textbookResult)
 
         case 'edited_books':
@@ -249,6 +261,9 @@ export async function POST(request) {
             [params.id, params.email]
           )
           await invalidateProfileIfNeeded(type, params);
+          if (PUBLICATION_TYPES.includes(type)) {
+            await invalidatePublicationsCache(params.email);
+          }
           return NextResponse.json(chapterResult)
 
         case 'sponsored_projects':
