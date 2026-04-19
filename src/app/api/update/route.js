@@ -133,6 +133,7 @@ export async function PUT(request) {
           }
         }
       }
+
       const result = await query(
         `UPDATE notices SET 
             title = ?,
@@ -159,6 +160,7 @@ export async function PUT(request) {
             params.data.isVisible === undefined ? 1 : Number(params.data.isVisible),
             session.user.email,
             params.data.notice_type || null,
+            params.data.notice_sub_type||null,
             params.data.department || null,
             params.data.id
         ]

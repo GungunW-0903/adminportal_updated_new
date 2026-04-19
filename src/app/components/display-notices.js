@@ -231,6 +231,7 @@ const DataDisplay = ({ data }) => {
                     to: (page + 1) * rowsPerPage,
                     type: 'between',
                     notice_type: noticeType,
+                    notice_sub_type:filterQuery?.notice_sub_type||null,
                     department: department
                 })
             })
@@ -257,6 +258,10 @@ const DataDisplay = ({ data }) => {
             } else if (filterQuery.notice_type && filterQuery.notice_type !== 'all') {
                 filteredData = filteredData.filter(notice => notice.notice_type === filterQuery.notice_type);
             }
+            if (filterQuery?.notice_sub_type) {
+                filteredData = filteredData.filter(notice => notice.notice_sub_type === filterQuery.notice_sub_type);
+            }
+       
             
             if (filterQuery.department && filterQuery.department !== 'all') {
                 filteredData = filteredData.filter(notice => notice.department === filterQuery.department);
