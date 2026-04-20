@@ -1,5 +1,24 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { off } from 'node:cluster'
+
+const safeParse = (value) => {
+  if (!value) return []
+  if (typeof value !== 'string') return Array.isArray(value) ? value : []
+  
+  // If it's a plain string (not JSON), wrap it in array
+  if (!value.startsWith('[') && !value.startsWith('{')) {
+    return [value]
+  }
+  
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch (e) {
+    // If parsing fails, treat plain string as single item
+    return [value]
+  }
+}
 
 export async function GET(request) {
   try {
@@ -7,26 +26,48 @@ export async function GET(request) {
     const type = searchParams.get('type')
     const now = new Date().getTime()
 
-    let results
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1);
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 20);
+    const offset = (page - 1) * limit;
+
+    let results = []
+    let total = 0
+
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(`SELECT COUNT(*) as count FROM news`)
+        total = Number(countRes[0].count)
+
         results = await query(
-          `SELECT * FROM news ORDER BY openDate DESC`
+          `SELECT * FROM news ORDER BY openDate DESC LIMIT ${limit} OFFSET ${offset}`,
         )
         break
-
-      case 'active':
+}
+      case 'active':{
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM news 
+           WHERE openDate < ? AND closeDate > ?`,
+          [now, now]
+        )
+        total = Number(countRes[0].count)
         results = await query(
           `SELECT * FROM news 
            WHERE openDate < ? AND closeDate > ? 
-           ORDER BY openDate DESC`,
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`,
           [now, now]
         )
         break
-
+}
       default:
         // If type is an ID, fetch specific news
         if (type) {
+          const countRes = await query(
+            `SELECT COUNT(*) as count FROM news WHERE id = ?`,
+            [type]
+          )
+          total = Number(countRes[0].count)
+
           results = await query(
             `SELECT * FROM news WHERE id = ?`,
             [type]
@@ -42,15 +83,18 @@ export async function GET(request) {
     // Parse JSON fields for each result
     const newsItems = JSON.parse(JSON.stringify(results))
     newsItems.forEach(item => {
-      if (item.image) {
-        item.image = JSON.parse(item.image)
-      }
-      if (item.attachments) {
-        item.attachments = JSON.parse(item.attachments)
-      }
+      item.image = safeParse(item.image)
+      item.attachments = safeParse(item.attachments)
     })
 
-    return NextResponse.json(newsItems)
+    return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: newsItems
+    })
 
   } catch (error) {
     console.error('API Error:', error)
@@ -65,26 +109,52 @@ export async function POST(request) {
   try {
     const body = await request.json()
     const { type } = body
-    
-    let results
+
+    let {from, to} = body
+
+    from = parseInt(from) || 0
+    to = parseInt(to) || 20
+
+    if (from < 0) from = 0
+    if (to <= from) to = from + 10
+
+    const limit = Math.max(1, Math.min(50, to - from))
+    const offset = Math.max(0, from)
+    const page = Math.floor(offset / limit) + 1
+
+    let results = []
+    let total = 0
+
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(`SELECT COUNT(*) as count FROM news`)
+        total = Number(countRes[0].count)
         results = await query(
           `SELECT * FROM news 
-           ORDER BY openDate DESC`
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
-
-      case 'range':
+}
+      case 'range':{
         const { start_date, end_date } = body
+
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM news 
+           WHERE closeDate <= ? AND openDate >= ?`,
+          [end_date, start_date]
+        )
+        total = Number(countRes[0].count)
+
         results = await query(
           `SELECT * FROM news 
            WHERE closeDate <= ? AND openDate >= ? 
-           ORDER BY openDate DESC`,
+           ORDER BY openDate DESC
+           LIMIT ${limit} OFFSET ${offset}`,
           [end_date, start_date]
         )
         break
-
+}
       default:
         return NextResponse.json(
           { message: 'Invalid type parameter' },
@@ -95,28 +165,18 @@ export async function POST(request) {
     // Parse JSON fields for each result
     const newsItems = JSON.parse(JSON.stringify(results))
     newsItems.forEach(item => {
-      if (item.image) {
-        try {
-          item.image = JSON.parse(item.image)
-        } catch (e) {
-          item.image = []
-        }
-      } else {
-        item.image = []
-      }
-      
-      if (item.attachments) {
-        try {
-          item.attachments = JSON.parse(item.attachments)
-        } catch (e) {
-          item.attachments = []
-        }
-      } else {
-        item.attachments = []
-      }
+      item.image = safeParse(item.image)
+      item.attachments = safeParse(item.attachments)
     })
 
-    return NextResponse.json(newsItems)
+    return NextResponse.json({
+      page: Math.floor(offset / limit) + 1,
+      limit,
+      offset,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: newsItems
+    })
 
   } catch (error) {
     console.error('API Error:', error)

@@ -27,8 +27,13 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
+
+    const page = Math.max(1,parseInt(searchParams.get('page')) || 1);
+    const limit = Math.min(50,parseInt(searchParams.get('limit')) || 20);
+    const offset = (page - 1) * limit;
     const type = searchParams.get('type')
-    let results
+    let results = []
+    let total = 0
 
     const origin = request.headers.get('origin')
     const isAllowedOrigin = allowedOrigins.includes(origin)
@@ -77,7 +82,12 @@ export async function GET(request) {
           );
 
     switch (type) {
-      case 'all':
+      case 'all':{
+        const countRes = await query(
+          `SELECT COUNT(*) as count FROM user WHERE is_deleted = 0`
+        )
+        total = Number(countRes[0].count)
+
         results = await query(
           `SELECT 
             u.*, 
@@ -93,51 +103,86 @@ export async function GET(request) {
             ${subqueries.join(',\n    ')}
               FROM user u 
               WHERE u.is_deleted = 0
-              ORDER BY u.name ASC`
+                ORDER BY u.name ASC, u.email ASC
+              LIMIT ${limit} OFFSET ${offset}`
         )
         // Transform the results to include role name
-        return NextResponse.json(results.map(user => ({
-          ...user,
-          role: user.role_name // Replace numeric role with string role
-        })))
-
-      case 'faculties':
-        results = []
+        return NextResponse.json({
+          page,
+          limit,
+          offset,
+          total,
+          totalPages: Math.ceil(total / limit),
+          data: results.map(u => ({
+            ...u,
+            role: u.role_name
+          }))
+        })
+      }
+    
+      case 'faculties':{
         const departments = [...depList.values()]
         
         // Fetch faculty from each department
-        for (let i = 0; i < departments.length - 1; i++) {
+        for (let i = 0; i < departments.length; i++) {
           const data = await query(
-            `SELECT * FROM user WHERE department = ? AND is_deleted = 0 ORDER BY name ASC`,
+            `SELECT * FROM user WHERE department = ? AND is_deleted = 0 ORDER BY name ASC, email ASC`,
             [departments[i]]
-          ).catch(e => console.error('Department query error:', e))
-          
-          if (data) {
-            results = [...results, ...data]
-          }
+          )
+          results = [...results, ...data]
         }
-        return NextResponse.json(results.sort())
 
-      case 'count':
+        total = results.length
+
+        const paginated = results
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .slice(offset, offset + limit)
+
+        return NextResponse.json({
+          page,
+          limit,
+          offset,
+          total,
+          totalPages: Math.ceil(total / limit),
+          data: paginated
+        })
+      
+      }
+      case 'count':{
         const countResult = await query(
           `SELECT COUNT(*) as count FROM user WHERE is_deleted = 0`
         )
         return NextResponse.json({ 
           facultyCount: countResult[0].count 
         })
-
+      }
       default:
         // Check if it's a department query
         if (depList.has(type)) {
+          const countRes = await query(
+            `SELECT COUNT(*) as count FROM user WHERE department = ? AND is_deleted = 0`,
+            [depList.get(type)]
+          )
+          total = Number(countRes[0].count)
+
           results = await query(
             `SELECT 
             u.*, 
             ${subqueries.join(',\n    ')}
               FROM user u
-              where department = ? AND u.is_deleted = 0`,
+              where department = ? AND u.is_deleted = 0
+              ORDER BY u.name ASC, u.email ASC
+              LIMIT ${limit} OFFSET ${offset}`,
             [depList.get(type)]
           )
-          return NextResponse.json(results)
+          return NextResponse.json({
+            page,
+            limit,
+            offset,
+            total,
+            totalPages: Math.ceil(total / limit),
+            data: results
+          })
         }
 
         // Individual faculty profile query - OPTIMIZED WITH CONNECTION POOLING

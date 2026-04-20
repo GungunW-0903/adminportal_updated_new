@@ -1,25 +1,50 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 
+const safeParse = (value) => {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return []
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const now = new Date().getTime()
 
-    let results
+    const page = Math.max(1, parseInt(searchParams.get('page')) || 1)
+    const limit = Math.min(50, parseInt(searchParams.get('limit')) || 20)
+    const offset = (page - 1) * limit
+
+    let results = []
+    let total = 0
     switch (type) {
       case 'all':
+        const allCount = await query(`SELECT COUNT(*) as count FROM innovation`)
+        total = Number(allCount[0].count)
+
         results = await query(
-          `SELECT * FROM innovation ORDER BY openDate DESC`
+          `SELECT * FROM innovation ORDER BY COALESCE(openDate, 0) DESC, id DESC LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
       case 'active':
+
+        const activeCount = await query(
+          `SELECT COUNT(*) as count FROM innovation 
+           WHERE openDate < ? AND closeDate > ?`,
+          [now, now]
+        )
+        total = Number(activeCount[0].count)
+
         results = await query(
           `SELECT * FROM innovation 
            WHERE openDate < ? AND closeDate > ? 
-           ORDER BY openDate DESC`,
+           ORDER BY COALESCE(openDate, 0) DESC, id DESC
+           LIMIT ${limit} OFFSET ${offset}`,
           [now, now]
         )
         break
@@ -39,6 +64,8 @@ export async function GET(request) {
             `SELECT * FROM innovation WHERE id = ?`,
             [type]
           )
+
+          total = Number(results.length)
         } else {
           return NextResponse.json(
             { message: 'Invalid type parameter' },
@@ -48,14 +75,20 @@ export async function GET(request) {
     }
 
     // Parse image JSON for each result
-    const innovations = JSON.parse(JSON.stringify(results))
-    innovations.forEach(innovation => {
-      if (innovation.image) {
-        innovation.image = JSON.parse(innovation.image)
-      }
+    const innovations = results.map(item => ({
+      ...item,
+      image: item.image ? safeParse(item.image) : []
+    }))
+
+    return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages : Math.ceil(total/limit),
+      data : innovations
     })
 
-    return NextResponse.json(innovations)
 
   } catch (error) {
     console.error('API Error:', error)
@@ -71,27 +104,47 @@ export async function POST(request) {
     const body = await request.json()
     const { type } = body
     
+    let { from, to} = body
+    from = parseInt(from) || 0
+    to = parseInt(to) || 20
+
+    if (from < 0) from = 0
+    if (to <= from) to = from + 10
+
+    const limit = Math.max(1, Math.min(50, to - from))
+    const offset = Math.max(0, from)
+    const page = Math.floor(offset / limit) + 1
+
     let results
+    let total = 0
     switch (type) {
       case 'range':
-        const { start_date, end_date, from, to } = body
+        const { start_date, end_date } = body
+        const rangeCount = await query(
+          `SELECT COUNT(*) as count FROM innovation 
+           WHERE closeDate <= ? AND openDate >= ?`,
+          [end_date, start_date]
+        )
+        total = Number(rangeCount[0].count)
+
         results = await query(
           `SELECT * FROM innovation 
            WHERE closeDate <= ? AND openDate >= ? 
-           ORDER BY openDate DESC LIMIT ?, ?`,
-          [end_date, start_date, from, to - from]
+           ORDER BY COALESCE(openDate, 0) DESC, id DESC LIMIT ${limit} OFFSET ${offset}`,
+          [end_date, start_date]
         )
         break
 
       case 'between':
-        let { from: fromIndex, to: toIndex } = body
-        fromIndex = parseInt(fromIndex, 10);
-        toIndex = parseInt(toIndex, 10);
+        const betweenCount = await query(
+          `SELECT COUNT(*) as count FROM innovation`
+        )
+        total = Number(betweenCount[0].count)
+
         results = await query(
           `SELECT * FROM innovation 
-           ORDER BY openDate DESC 
-           LIMIT ?,?`,
-          [fromIndex, toIndex - fromIndex]
+            ORDER BY COALESCE(openDate, 0) DESC, id DESC 
+           LIMIT ${limit} OFFSET ${offset}`
         )
         break
 
@@ -103,14 +156,19 @@ export async function POST(request) {
     }
 
     // Parse image JSON for each result
-    const innovations = JSON.parse(JSON.stringify(results))
-    innovations.forEach(innovation => {
-      if (innovation.image) {
-        innovation.image = JSON.parse(innovation.image)
-      }
-    })
+    const innovations = results.map(item => ({
+      ...item,
+      image: item.image ? safeParse(item.image) : []
+    }))
 
-    return NextResponse.json(innovations)
+    return NextResponse.json({
+      page,
+      limit,
+      offset,
+      total,
+      totalPages : Math.ceil(total/limit),
+      data : innovations
+    })
 
   } catch (error) {
     console.error('API Error:', error)
