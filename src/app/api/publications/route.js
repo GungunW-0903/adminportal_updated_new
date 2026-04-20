@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { depList } from '@/lib/const'
+import { getPublicationsKey,getPublicationsCache,setPublicationsCache } from '@/lib/publicationsCache'
 
 export async function GET(request) {
   try {
